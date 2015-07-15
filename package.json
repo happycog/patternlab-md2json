@@ -36,6 +36,9 @@
     "grunt": "~0.4.5"
   },
   "keywords": [
-    "patternlab, markdown"
+    "gruntplugin",
+    "patternlab",
+    "markdown",
+    "annotations"
   ]
 }
