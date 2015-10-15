@@ -30,7 +30,15 @@ module.exports = function(grunt) {
         annotations: {
             options: {
                 minify: false,
-                width: 60
+                width: 60,
+                html: {
+                  'template': 'templates/annotations.html',
+                  'outfile': 'tmp/annotations.html',
+                  'meta': {
+                    'title': 'Annotations',
+                    'header': 'Annotations'
+                  }
+                }
             },
             files: {
                 'tmp/annotations.js': ['fixtures/*.md']

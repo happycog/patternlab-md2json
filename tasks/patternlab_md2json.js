@@ -17,7 +17,15 @@ module.exports = function(grunt) {
 
     var options = this.options({
       minify: false,
-      width: 50
+      width: 50,
+      html: {
+        'template': 'templates/annotations.html',
+        'outfile': 'tmp/annotations.html',
+        'meta': {
+          'title': 'Annotations',
+          'header': 'Annotations'
+        }
+      }
     });
 
     this.files.forEach(function(f) {
@@ -25,6 +33,9 @@ module.exports = function(grunt) {
       try {
         md2json.parse(f.src, options);
         grunt.log.ok('annotations file created at ' + options.outfile);
+        if (options.html) {
+          grunt.log.ok('annotations html file created at ' + options.html.outfile);
+        }
       } catch(e) {
         grunt.log.error();
         grunt.verbose.error(e);

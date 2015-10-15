@@ -2,6 +2,7 @@ var path = require('path'),
     os = require('os'),
     fs = require('fs'),
     marked = require('marked'),
+    mustache = require('mustache'),
     _ = require('lodash');
 
 exports.parse = function(files, options) {
@@ -15,6 +16,10 @@ exports.parse = function(files, options) {
     });
 
     writeFile(annotations, options);
+
+    if (options.html) {
+      writeHTML(annotations, options);
+    }
 
     function parseText(file) {
 
@@ -34,7 +39,7 @@ exports.parse = function(files, options) {
               annotations.push(annotation);
             }
             entry = line.replace(pre, '').split(":");
-            annotation[entry[0]] = entry[1];
+            annotation[entry[0]] = entry[1].trim();
             if (i == lines.length - 1) {
               annotations.push(annotation);
             }
@@ -77,6 +82,16 @@ exports.parse = function(files, options) {
           return json;
       }
 
+    }
+
+    function writeHTML(annotations, options) {
+      var json = {'comments': annotations, 'meta': options.html.meta},
+          template = fs.readFileSync(options.html.template, 'utf8'),
+          rendered = mustache.render(template, json),
+          file = fs.openSync(options.html.outfile, 'w+');
+      fs.writeSync(file, rendered);
+      fs.closeSync(file);
+      return;
     }
 
 

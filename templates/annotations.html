@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{meta.title}}</title>
+</head>
+<body>
+    <div>
+        <h1>{{meta.header}}</h1>
+        <section>
+            {{#comments}}
+                <article>
+                    <h2>{{title}}</h2>
+                    <code>{{el}}</code>
+                    <div>{{{comment}}}</div>
+                </article>
+            {{/comments}}
+        </section>
+    </div>
+</body>
+</html>
