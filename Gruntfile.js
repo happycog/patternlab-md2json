@@ -27,23 +27,26 @@ module.exports = function(grunt) {
     },
 
     patternlab_md2json: {
-        annotations: {
-            options: {
-                minify: false,
-                width: 60,
-                html: {
-                  'template': 'templates/annotations.html',
-                  'outfile': 'tmp/annotations.html',
-                  'meta': {
-                    'title': 'Annotations',
-                    'header': 'Annotations'
-                  }
-                }
+      annotations: {
+        options: {
+          minify: false,
+          width: 60,
+          html: {
+            'template': 'templates/annotations.html',
+            'outfile': 'tmp/annotations.html',
+            'meta': {
+              'title': 'Annotations',
+              'header': 'Annotations',
+              'intro': 'Introductory text...'
             },
-            files: {
-                'tmp/annotations.js': ['fixtures/*.md']
-            },
-        }
+            'patterns': ['atoms', 'molecules', 'organisms', 'templates', 'pages'],
+            'docFileSuffix': '-extra'
+          }
+        },
+        files: {
+          'tmp/annotations.js': ['fixtures/*.md']
+        },
+      }
     }
 
   });

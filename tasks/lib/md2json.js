@@ -3,96 +3,190 @@ var path = require('path'),
     fs = require('fs'),
     marked = require('marked'),
     mustache = require('mustache'),
-    _ = require('lodash');
+    _ = require('lodash'),
+    Entities = require('html-entities').AllHtmlEntities;
 
-exports.parse = function(files, options) {
+exports.parse = function(files, options, company) {
 
-    var annotations = [];
+    init();
 
-    _(files).each(function(file) {
-      var text = parseText(file);
-      var markdown = parseMarkdown(text);
-      annotations = annotations.concat(markdown);
-    });
-
-    writeFile(annotations, options);
-
-    if (options.html) {
-      writeHTML(annotations, options);
+    function init() {
+        writeJSON();
+        if (options.html) {
+            writeHTML();
+        }
     }
 
-    function parseText(file) {
+    function annotate(files, type) {
 
-      var text = fs.readFileSync(file, 'utf8');
-      var lines = text.split(os.EOL);
-      var pre = "-- ";
-      var annotations = [];
-      var annotation = {
-        'el': '',
-        'title': '',
-        'comment': ''
-      };
-
-      _(lines).each(function(line, i) {
-          if (line.indexOf(pre) !== -1) {
-            if (annotation.el && annotation.el !== '') {
-              annotations.push(annotation);
+        var annotated = [];
+        _(files).each(function(file, ii) {
+            if (type && type !== patternType(file)) {
+                return;
             }
-            entry = line.replace(pre, '').split(":");
-            annotation[entry[0]] = entry[1].trim();
-            if (i == lines.length - 1) {
-              annotations.push(annotation);
+            var text = parseText(file, type, ii);
+            if (text) {
+                var markdown = parseMarkdown(text);
+                annotated = annotated.concat(markdown);
             }
-          } else {
-            annotation['comment'] = annotation.comment + line + "\n";
-          }
-      });
+        });
+        return annotated;
+    }
 
-      return annotations;
+    function patternType(path) {
+        return path.slice(0, -3).split('/').slice(2)[0].split('-')[1]
+    }
+
+    function patternPath(path, type) {
+        var rootPath = path.slice(0, -3).split('/').slice(2).join('-');
+        var filePath = 'patterns/' + rootPath + '/' + rootPath;
+        switch (type) {
+            case 'html':
+                path = filePath + '.html';
+                break;
+            case 'escaped.html':
+                path = filePath + '.escaped.html';
+                break;
+            case 'mustache':
+            default:
+                path = filePath + '.mustache';
+                break;
+        }
+        return path;
+    }
+
+    function patternCode(path, type) {
+        switch (type) {
+            case 'html':
+                path.replace('.md', '.escaped.html')
+                break;
+            case 'docs':
+                path.replace('.md', options.html.docFileSuffix + '.md')
+                break;
+            case 'mustache':
+            default:
+                path.replace('.md', '.mustache')
+                break;
+        }
+        return fs.readFileSync('public/' + path, 'utf8');
+    }
+
+    function patternDocs(path, type) {
+        return fs.readFileSync(path, 'utf8');
+    }
+
+    function parseText(file, type, ii) {
+
+        if (fs.existsSync(file.replace(".md", '.mustache'))) {
+            var docFile = file.replace(".md", options.html.docFileSuffix + ".md");
+            var text = fs.readFileSync(file, 'utf8');
+            var lines = text.split(os.EOL);
+            var pre = "-- ";
+            var annotations = [];
+            var annotation = {};
+
+            var annotationKeys = ['el', 'title', 'comment'];
+            if (type) {
+                annotationKeys.unshift('id', 'patternUrl', 'patternHtml', 'patternMustache', 'patternDocs');
+            }
+            _(annotationKeys).each(function(key) {
+                annotation[key] = '';
+            });
+
+            var entities = new Entities();
+
+            _(lines).each(function(line, i) {
+                if (line.indexOf(pre) !== -1) {
+                    if (annotation.el && annotation.el !== '') {
+                        annotations.push(annotation);
+                    }
+                    entry = line.replace(pre, '').split(":");
+                    annotation[entry[0]] = entry[1].trim();
+                    if (i == lines.length - 1) {
+                        annotations.push(annotation);
+                    }
+                } else {
+                    annotation['comment'] = annotation.comment + line + "\n";
+                }
+            });
+
+            if (type) {
+                annotation['id'] = ii;
+                annotation['patternUrl'] = patternPath(file, 'html');
+                annotation['patternHtml'] = entities.decode(patternCode(patternPath(file, 'escaped.html'), 'html'));
+                annotation['patternMustache'] = entities.decode(patternCode(patternPath(file)));
+
+                if (fs.existsSync(docFile)) {
+                    annotation['patternDocs'] = marked(patternDocs(docFile));
+                }
+
+            }
+
+            return annotations;
+
+        } else {
+            return;
+        }
+
     }
 
 
     function parseMarkdown(blocks) {
 
-      _(blocks).each(function(block) {
-          block.comment = marked(block.comment);
-      });
+        _(blocks).each(function(block) {
+            block.comment = marked(block.comment);
+        });
 
-      return blocks;
+        return blocks;
     }
 
-    function writeFile(annotations, options) {
+    function writeHTML() {
 
-      var json;
+        var json = {
+            'meta': options.html.meta,
+            'patterns': {}
+        };
 
-      if (options.minify) {
-          json = JSON.stringify(annotations);
-      } else {
-          json = JSON.stringify(annotations, null, 2) + "\n";
-      }
+        _(options.html.patterns).each(function(type, i) {
+            json['patterns'][type] = annotate(files, type);
+        });
 
-      var content = "var comments = { \"comments\":" + json + "};";
+        var template = fs.readFileSync(options.html.template, 'utf8');
+        var rendered = mustache.render(template, json);
+        var file = fs.openSync(options.html.outfile, 'w+');
+        fs.writeSync(file, rendered);
+        fs.closeSync(file);
 
-      if (options.outfile) {
-          var file = fs.openSync(options.outfile, 'w+');
-          fs.writeSync(file, content);
-          fs.closeSync(file);
-          return;
-      } else {
-          return json;
-      }
+        var jsonFile = fs.openSync(options.html.outfile.replace('html', 'json'), 'w+');
+        fs.writeSync(jsonFile, JSON.stringify(json));
+        fs.closeSync(jsonFile);
+
+        return;
 
     }
 
-    function writeHTML(annotations, options) {
-      var json = {'comments': annotations, 'meta': options.html.meta},
-          template = fs.readFileSync(options.html.template, 'utf8'),
-          rendered = mustache.render(template, json),
-          file = fs.openSync(options.html.outfile, 'w+');
-      fs.writeSync(file, rendered);
-      fs.closeSync(file);
-      return;
-    }
+    function writeJSON() {
 
+        var json, content, annotations, type = null;
+        annotations = annotate(files, type);
+
+        if (options.minify) {
+            json = JSON.stringify(annotations);
+        } else {
+            json = JSON.stringify(annotations, null, 2) + "\n";
+        }
+
+        content = "var comments = { \"comments\":" + json + "};";
+
+        if (options.outfile) {
+            file = fs.openSync(options.outfile, 'w+');
+            fs.writeSync(file, content);
+            fs.closeSync(file);
+            return;
+        } else {
+            return json;
+        }
+
+    }
 
 }
